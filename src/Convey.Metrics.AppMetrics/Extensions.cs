@@ -6,6 +6,7 @@ using App.Metrics.AspNetCore.Health.Endpoints;
 using App.Metrics.AspNetCore.Tracking;
 using App.Metrics.Formatters.Prometheus;
 using Convey.Metrics.AppMetrics.Builders;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,24 +16,24 @@ namespace Convey.Metrics.AppMetrics
     public static class Extensions
     {
         private static bool _initialized;
-        private const string SectionName = "appMetrics";
-        private const string RegistryName = "metrics.appMetrics";
+        private const string SectionName = "metrics";
+        private const string RegistryName = "metrics.metrics";
 
-        public static IConveyBuilder AddAppMetrics(this IConveyBuilder builder, string sectionName = SectionName)
+        public static IConveyBuilder AddMetrics(this IConveyBuilder builder, string sectionName = SectionName)
         {
             var options = builder.GetOptions<MetricsOptions>(sectionName);
-            return builder.AddAppMetrics(options);
+            return builder.AddMetrics(options);
         }
-        
-        public static IConveyBuilder AddAppMetrics(this IConveyBuilder builder, 
+
+        public static IConveyBuilder AddMetrics(this IConveyBuilder builder,
             Func<IMetricsOptionsBuilder, IMetricsOptionsBuilder> buildOptions)
         {
             var options = buildOptions(new MetricsOptionsBuilder()).Build();
-            return builder.AddAppMetrics(options);
+            return builder.AddMetrics(options);
         }
 
-        public static IConveyBuilder AddAppMetrics(this IConveyBuilder builder, MetricsOptions options)
-        {           
+        public static IConveyBuilder AddMetrics(this IConveyBuilder builder, MetricsOptions options)
+        {
             builder.Services.AddSingleton(options);
             if (!builder.TryRegister(RegistryName) || !options.Enabled || _initialized)
             {
@@ -62,7 +63,7 @@ namespace Convey.Metrics.AppMetrics
                     }
                 }
             });
-            
+
             if (options.InfluxEnabled)
             {
                 metricsBuilder.Report.ToInfluxDb(o =>
@@ -73,6 +74,7 @@ namespace Convey.Metrics.AppMetrics
                     o.FlushInterval = TimeSpan.FromSeconds(options.Interval);
                 });
             }
+
             var metrics = metricsBuilder.Build();
             var metricsWebHostOptions = GetMetricsWebHostOptions(options);
 
@@ -88,7 +90,8 @@ namespace Convey.Metrics.AppMetrics
                 builder.Services.AddSingleton<IStartupFilter>(new DefaultMetricsTrackingStartupFilter());
                 builder.Services.AddMetricsReportingHostedService(metricsWebHostOptions.UnobservedTaskExceptionHandler);
                 builder.Services.AddMetricsEndpoints(metricsWebHostOptions.EndpointOptions, configuration);
-                builder.Services.AddMetricsTrackingMiddleware(metricsWebHostOptions.TrackingMiddlewareOptions, configuration);
+                builder.Services.AddMetricsTrackingMiddleware(metricsWebHostOptions.TrackingMiddlewareOptions,
+                    configuration);
                 builder.Services.AddMetrics(metrics);
             }
 
@@ -98,7 +101,7 @@ namespace Convey.Metrics.AppMetrics
         private static MetricsWebHostOptions GetMetricsWebHostOptions(MetricsOptions metricsOptions)
         {
             var options = new MetricsWebHostOptions();
-            
+
             if (!metricsOptions.Enabled)
             {
                 return options;
@@ -126,5 +129,11 @@ namespace Convey.Metrics.AppMetrics
 
             return options;
         }
+
+        public static IApplicationBuilder UseMetrics(this IApplicationBuilder app)
+            => app
+                .UseHealthAllEndpoints()
+                .UseMetricsAllEndpoints()
+                .UseMetricsAllMiddleware();
     }
 }
