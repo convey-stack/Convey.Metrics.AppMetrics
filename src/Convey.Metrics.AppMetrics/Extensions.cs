@@ -33,6 +33,7 @@ namespace Convey.Metrics.AppMetrics
 
         public static IConveyBuilder AddAppMetrics(this IConveyBuilder builder, MetricsOptions options)
         {           
+            builder.Services.AddSingleton(options);
             if (!builder.TryRegister(RegistryName) || !options.Enabled || _initialized)
             {
                 return builder;
