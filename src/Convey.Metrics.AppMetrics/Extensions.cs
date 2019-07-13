@@ -131,9 +131,19 @@ namespace Convey.Metrics.AppMetrics
         }
 
         public static IApplicationBuilder UseMetrics(this IApplicationBuilder app)
-            => app
-                .UseHealthAllEndpoints()
-                .UseMetricsAllEndpoints()
-                .UseMetricsAllMiddleware();
+        {
+            MetricsOptions options;
+            using (var scope = app.ApplicationServices.CreateScope())
+            {
+                options = scope.ServiceProvider.GetService<MetricsOptions>();
+            }
+
+            return !options.Enabled
+                ? app
+                : app
+                    .UseHealthAllEndpoints()
+                    .UseMetricsAllEndpoints()
+                    .UseMetricsAllMiddleware();
+        }
     }
 }
